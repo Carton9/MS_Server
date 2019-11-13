@@ -11,6 +11,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
 
+import org.carton.common.secure.KeyUnit;
+
 /**
  * @author c
  *
@@ -18,34 +20,119 @@ import java.util.Set;
 // SQL@<>
 public class SQLInterface<T> implements DataInterface<T>,Closeable {
     private Connection conn = null ;
-    private String url = "jdbc:mysql://localhost/test ";
+    DataInterface<T> upper;
+    private String url = "jdbc:mysql://localhost ";
     private String user = "root ";
     private String pwd = "0429 ";
     private static final String type="SQL";
 	@Override
 	public T getData(Class source,String key) {
 		// TODO Auto-generated method stub
+		if(conn==null)return null;
+		
 		Query q=Query.formate(key);
-		if(!q.path.contains("SQL"))return null;
-		return null;
+		boolean isSQL=q.path.contains("SQL");
+		boolean haveAllInfo=q.valueFile.containsKey("SITE")&&q.valueFile.containsKey("TABLE")&&q.valueFile.containsKey("ACTION");
+		if(!isSQL||!haveAllInfo)return null;
+		String site=q.valueFile.get("SITE").get("VALUE");
+		site=KeyUnit.MD5(site);
+		String table=q.valueFile.get("TABLE").get("VALUE");
+		String action=q.valueFile.get("ACTION").get("VALUE");
+		String statement=q.valueFile.get("STMS").get("VALUE");
+		HashMap<String, String> column=q.valueFile.get("COLUMN");
+		try (Statement st = conn.createStatement();){
+			checkDatabase(st,site);
+			/**********************************************************/
+			if(action.contains("DIRECT")&&statement!=null) {
+				st.executeQuery(KeyUnit.BASE64decode(statement));
+			}
+			if(!checkTable(st,site))return null;
+			/**********************************************************/
+			T result=null;
+			if(action.contains("SEARCH"))
+				result= (T) search(table,column);
+			st.close();
+			return result;
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return null;
+		}
+		/**********************************************************/
+		
 	}
-
+	private void checkDatabase(Statement st,String site) throws SQLException {
+		ResultSet rs=st.executeQuery("show databases");
+		boolean isContain=false;
+		do {
+			if(rs.getString("Database").equals(site)) {
+				isContain=true;
+				st.executeQuery("use "+site);
+				break;
+			}
+		}while(rs.next());
+		if(isContain==false) {
+			st.executeQuery("CREATE DATABASE "+site);
+			st.executeQuery("use "+site);
+		}
+	}
+	private boolean checkTable(Statement st,String site) throws SQLException {
+		ResultSet rs=st.executeQuery("show tables");
+		boolean isContain=false;
+		do {
+			if(rs.getString(1).equals(site)) {
+				isContain=true;
+				break;
+			}
+		}while(rs.next());
+		return isContain;
+	}
 	@Override
 	public boolean saveData(String key, T obj) {
 		// TODO Auto-generated method stub
+		if(conn==null)return false;
+		
+		Query q=Query.formate(key);
+		boolean isSQL=q.path.contains("SQL");
+		boolean haveAllInfo=q.valueFile.containsKey("SITE")&&q.valueFile.containsKey("TABLE")&&q.valueFile.containsKey("ACTION");
+		if(!isSQL||!haveAllInfo)return false;
+		String site=q.valueFile.get("SITE").get("VALUE");
+		site=KeyUnit.MD5(site);
+		String table=q.valueFile.get("TABLE").get("VALUE");
+		String action=q.valueFile.get("ACTION").get("VALUE");
+		String statement=q.valueFile.get("STMS").get("VALUE");
+		HashMap<String, String> column=q.valueFile.get("COLUMN");
+		HashMap<String, String> update=q.valueFile.get("UPDATE");
+		try (Statement st = conn.createStatement();){
+			checkDatabase(st,site);
+			/**********************************************************/
+			if(action.contains("DIRECT")&&statement!=null) {
+				st.executeQuery(KeyUnit.BASE64decode(statement));
+			}
+			if(!checkTable(st,site))return false;
+			/**********************************************************/
+			boolean result=false;
+			if(action.contains("UPDATE")||action.contains("INSERT"))
+				result=update(table,column,update);
+			st.close();
+			return result;
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		return false;
 	}
 
 	@Override
 	public String getName() {
 		// TODO Auto-generated method stub
-		return null;
+		return "SQL";
 	}
 
 	@Override
 	public void getUpperLevel(DataInterface<T> upper) {
 		// TODO Auto-generated method stub
-		
+		this.upper=upper;
 	}
 	private ArrayList<HashMap<String, String>> search(String table,HashMap<String, String> keyValues){
 		if(table==null||table.equals("")||keyValues==null)return null;

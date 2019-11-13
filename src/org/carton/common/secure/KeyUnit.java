@@ -3,6 +3,7 @@ package org.carton.common.secure;
 import java.io.Serializable;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 /**
  * 
  * @author mike
@@ -123,4 +124,11 @@ public abstract class KeyUnit implements Serializable{
 	  
 	    return strResult;  
 	  }
+	public static String BASE64Encode(String in) {
+		return Base64.getEncoder().encodeToString(in.getBytes());
+	}
+	public static String BASE64decode(String in) {
+		byte[] decodedBytes = Base64.getDecoder().decode(in);
+		return new String(decodedBytes);
+	}
 }
