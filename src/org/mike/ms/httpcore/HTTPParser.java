@@ -19,6 +19,7 @@ import org.mike.ms.httpcore.HTTPResourceCentor.HTTPCode;
 
 
 /**
+ * require work with HTTPWEBSITE
  * @author c
  *
  */
@@ -67,7 +68,12 @@ public class HTTPParser implements HTTPCoreDIPInterface,Runnable,Closeable{
 		// TODO Auto-generated method stub
 		while(!isClose) {
 			HTTPCase newCase=dataLink.getData(this.getClass(), "*@RAW");
-			parser(newCase);
+			try {
+				parser(newCase);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			dataLink.saveData(newCase.getCaseNumber().replace("RAW", "CASE"), newCase);
 		}
 	}

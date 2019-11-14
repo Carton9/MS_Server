@@ -25,11 +25,14 @@ public class SQLInterface<T> implements DataInterface<T>,Closeable {
     private String user = "root ";
     private String pwd = "0429 ";
     private static final String type="SQL";
+    public SQLInterface(String user,String pwd) {
+    	this.user=user;
+    	this.pwd=pwd;
+    }
 	@Override
 	public T getData(Class source,String key) {
 		// TODO Auto-generated method stub
 		if(conn==null)return null;
-		
 		Query q=Query.formate(key);
 		boolean isSQL=q.path.contains("SQL");
 		boolean haveAllInfo=q.valueFile.containsKey("SITE")&&q.valueFile.containsKey("TABLE")&&q.valueFile.containsKey("ACTION");
@@ -88,14 +91,14 @@ public class SQLInterface<T> implements DataInterface<T>,Closeable {
 		return isContain;
 	}
 	@Override
-	public boolean saveData(String key, T obj) {
+	public StatusCode saveData(String key, T obj) {
 		// TODO Auto-generated method stub
-		if(conn==null)return false;
+		if(conn==null)return StatusCode.DATA_SAVE_FAILURE;
 		
 		Query q=Query.formate(key);
 		boolean isSQL=q.path.contains("SQL");
 		boolean haveAllInfo=q.valueFile.containsKey("SITE")&&q.valueFile.containsKey("TABLE")&&q.valueFile.containsKey("ACTION");
-		if(!isSQL||!haveAllInfo)return false;
+		if(!isSQL||!haveAllInfo)return StatusCode.INTERFACE_NOT_FOUND;
 		String site=q.valueFile.get("SITE").get("VALUE");
 		site=KeyUnit.MD5(site);
 		String table=q.valueFile.get("TABLE").get("VALUE");
@@ -109,20 +112,19 @@ public class SQLInterface<T> implements DataInterface<T>,Closeable {
 			if(action.contains("DIRECT")&&statement!=null) {
 				st.executeQuery(KeyUnit.BASE64decode(statement));
 			}
-			if(!checkTable(st,site))return false;
+			if(!checkTable(st,site))return StatusCode.DATA_SAVE_FAILURE;
 			/**********************************************************/
 			boolean result=false;
 			if(action.contains("UPDATE")||action.contains("INSERT"))
 				result=update(table,column,update);
 			st.close();
-			return result;
+			return (result)?StatusCode.SECCESS:StatusCode.DATA_SAVE_FAILURE;
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		return false;
+		return StatusCode.DATA_SAVE_FAILURE;
 	}
-
 	@Override
 	public String getName() {
 		// TODO Auto-generated method stub
@@ -172,7 +174,7 @@ public class SQLInterface<T> implements DataInterface<T>,Closeable {
 		ArrayList<String> updates=new ArrayList<String>();
 		keys.addAll(keyValues.keySet());
 		updates.addAll(updateValue.keySet());
-		String insert="insert into Goods (Gname,Gprice,Gamount,Gdate,Gperson) values (?,?,?,?,?)";
+		//String insert="insert into Goods (Gname,Gprice,Gamount,Gdate,Gperson) values (?,?,?,?,?)";
 
 		if(result==null) {
 			String updateString="";

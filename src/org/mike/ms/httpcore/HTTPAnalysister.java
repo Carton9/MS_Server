@@ -43,5 +43,5 @@ public abstract class HTTPAnalysister implements HTTPCoreDIPInterface, Runnable,
 		this.hostName=hostName;
 	}
 	public abstract void AnalysisterClose();
-	public abstract void processCase(HTTPCase newCase)throws IOException;
+	public abstract void processCase(HTTPCase newCase);
 }

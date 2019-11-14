@@ -13,6 +13,9 @@ import java.util.HashMap;
 public class Query {
 	public ArrayList<String> path=new ArrayList<String>();
 	public HashMap<String, HashMap<String, String>> valueFile=new HashMap<String, HashMap<String,String>>();
+	private Query(){
+		
+	}
 	public static String formate(Query query) {
 		String result="";
 		for(int i=0;i<query.path.size();i++) {

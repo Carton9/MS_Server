@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
+import org.carton.common.secure.KeyUnit;
+
 /**
  * @author c
  *
@@ -39,24 +41,24 @@ public class FileInterface<T> implements DataInterface<T> {
 		return null;
 	}
 	@Override
-	public boolean saveData(String key, T obj) {
+	public StatusCode saveData(String key, T obj) {
 		// TODO Auto-generated method stub
-		if(key==null||key.equals(""))return false;
+		if(key==null||key.equals(""))return StatusCode.ENTRY_NOT_FOUND;
 		String[] query=key.split("@");
-		if(!query[query.length-1].contains(type))return false;
+		if(!query[query.length-1].contains(type))return StatusCode.INTERFACE_NOT_FOUND;
 		for(int i=query.length-2;i<0;i--) {
 			if(query[i].equals(getName())) {
 				try {
 					saveFile(obj);
-					return true;
+					return StatusCode.SECCESS;
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
-					return false;
+					return StatusCode.DATA_SAVE_FAILURE;
 				}
 			}
 		}
-		return false;
+		return StatusCode.ENTRY_NOT_FOUND;
 	}
 	void saveFile(T data) throws IOException {
 		FileOutputStream fos=new FileOutputStream(f);
@@ -67,7 +69,7 @@ public class FileInterface<T> implements DataInterface<T> {
 	@Override
 	public String getName() {
 		// TODO Auto-generated method stub
-		return f.getPath();
+		return KeyUnit.BASE64Encode(f.getPath());
 	}
 
 	@Override

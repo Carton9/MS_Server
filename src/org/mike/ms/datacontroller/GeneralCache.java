@@ -32,18 +32,18 @@ public class GeneralCache<T> implements DataInterface<T>{
 		return null;
 	}
 	@Override
-	public boolean saveData(String key, T obj) {
+	public StatusCode saveData(String key, T obj) {
 		// TODO Auto-generated method stub
-		if(key==null||key.equals(""))return false;
+		if(key==null||key.equals(""))return StatusCode.ENTRY_NOT_FOUND;
 		String[] query=key.split("@");
-		if(!query[query.length-1].contains(type))return false;
+		if(!query[query.length-1].contains(type))return StatusCode.INTERFACE_NOT_FOUND;
 		for(int i=query.length-2;i<0;i--) {
 			if(query[i].contains(getName())) {
 				cacheMap.put(query[query.length-1],obj);
-				return true;
+				return StatusCode.SECCESS;
 			}
 		}
-		return false;
+		return StatusCode.ENTRY_NOT_FOUND;
 	}
 	
 	@Override

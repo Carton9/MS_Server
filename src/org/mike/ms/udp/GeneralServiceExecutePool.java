@@ -33,7 +33,7 @@ public class GeneralServiceExecutePool {
 	 * will automticly initialize and  added in to an Executor.
 	 */
 	public GeneralServiceExecutePool() {
-		pool=Executors.newFixedThreadPool(MAXSIZE);
+		pool=Executors.newCachedThreadPool();
 		list=new ConcurrentHashMap<String,PoolUnit>();
 		isClose=new AtomicBoolean(false);
 	}

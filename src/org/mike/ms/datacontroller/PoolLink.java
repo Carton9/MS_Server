@@ -34,13 +34,13 @@ public class PoolLink<T> implements DataInterface<T> {
 		String query;
 		String type;
 		boolean isReplay;
-		boolean isSuccessful;
+		StatusCode statusCode;
 		Object obj;
 		public RemoteInfo clone(RemoteInfo info) {
 			query=info.query;
 			type=info.type;
 			isReplay=info.isReplay;
-			isSuccessful=info.isSuccessful;
+			statusCode=info.statusCode;
 			obj=info.obj;
 			return this;
 		}
@@ -85,14 +85,14 @@ public class PoolLink<T> implements DataInterface<T> {
 						if (rm.type.equals("READ")) {
 							Object obj=upper.getData(this.getClass(), rm.query);
 							if(obj==null) {
-								rp.isSuccessful=false;
+								rp.statusCode=StatusCode.ACCESS_FAILURE;
 							}else {
-								rp.isSuccessful=true;
+								rp.statusCode=StatusCode.SECCESS;
 								rp.obj=obj;
 							}
 						}else if(rm.type.equals("WRITE")) {
 							upper.saveData(rm.query, (T) rm.obj);
-							rp.isSuccessful=true;
+							rp.statusCode=StatusCode.SECCESS;
 							
 						}
 						try {
@@ -120,14 +120,14 @@ public class PoolLink<T> implements DataInterface<T> {
 	@Override
 	public String getName() {
 		// TODO Auto-generated method stub
-		return null;
+		return "PoolLink";
 	}
 
 	@Override
 	public T getData(Class source, String key) {
 		// TODO Auto-generated method stub
 		String secret=KeyUnit.SHA512(UUID.randomUUID().toString());
-		String query="REMOTE_R:"+secret+"@"+key;
+		String query="REMOTE_R_"+secret+"@"+key;
 		RemoteInfo remoteInfo=new RemoteInfo();
 		remoteInfo.query=query;
 		remoteInfo.type="READ";
@@ -186,7 +186,7 @@ public class PoolLink<T> implements DataInterface<T> {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 				RemoteInfo rm=RemoteCase.get(query);
-				if(rm.isSuccessful&&rm.isReplay&&rm.obj!=null) {
+				if(rm.statusCode==StatusCode.SECCESS&&rm.isReplay&&rm.obj!=null) {
 					return (T) rm.obj;
 				}
 			}
@@ -196,10 +196,11 @@ public class PoolLink<T> implements DataInterface<T> {
 	}
 
 	@Override
-	public boolean saveData(String key, T obj) {
+	public StatusCode saveData(String key, T obj) {
 		// TODO Auto-generated method stub
+		boolean stop=false;
 		String secret=KeyUnit.SHA512(UUID.randomUUID().toString());
-		String query="REMOTE_W:"+secret+"@"+key;
+		String query="REMOTE_W_"+secret+"@"+key;
 		RemoteInfo remoteInfo=new RemoteInfo();
 		remoteInfo.query=query;
 		remoteInfo.type="WRITE";
@@ -222,7 +223,7 @@ public class PoolLink<T> implements DataInterface<T> {
 				if(query.equals(rm.query))return true;
 				return false;
 			}
-			
+			int count=0;
 			@Override
 			public void process(byte[] data, InetAddress ip, int port) {
 				// TODO Auto-generated method stub
@@ -232,16 +233,19 @@ public class PoolLink<T> implements DataInterface<T> {
 				} catch (ClassNotFoundException | IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
+					finish=true;
 					return;
 				}
 				RemoteCase.get(query).clone(rm).notifyAll();
-				finish=rm.isSuccessful;
+				finish=(rm.statusCode==StatusCode.SECCESS);
 			}
 
 			@Override
 			public boolean isFinish() {
 				// TODO Auto-generated method stu
-				return finish;
+				if(RemoteCase.contains(query))
+					return finish;
+				return false;
 			}
 		});
 		try {
@@ -249,7 +253,7 @@ public class PoolLink<T> implements DataInterface<T> {
 		} catch (IOException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
-			return false;
+			return StatusCode.DATA_SAVE_FAILURE;
 		}
 		for(int i=0;i<100;i++) {
 			try {
@@ -258,13 +262,14 @@ public class PoolLink<T> implements DataInterface<T> {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 				RemoteInfo rm=RemoteCase.get(query);
-				if(rm.isSuccessful&&rm.isReplay) {
-					return rm.isSuccessful;
+				if(rm.statusCode==StatusCode.SECCESS&&rm.isReplay) {
+					return rm.statusCode;
 				}
 			}
 			
 		}
-		return false;
+		RemoteCase.remove(query);
+		return StatusCode.ENTRY_NOT_FOUND;
 	}
 
 	@Override
@@ -291,11 +296,10 @@ public class PoolLink<T> implements DataInterface<T> {
 		}else {
 			remoteInfo.isReplay=true;
 		}
-		if(ack==100) {
-			remoteInfo.isSuccessful=true;
+		remoteInfo.statusCode=StatusCode.formateCode(ack-1);
+		if(ack==StatusCode.SECCESS.getCode()+1) {
 			remoteInfo.obj=ois.readObject();
 		}
-		if(ack==200)remoteInfo.isSuccessful=false;
 		return remoteInfo;
 	}
 	private byte[] formateData(RemoteInfo data) throws IOException {
@@ -306,13 +310,13 @@ public class PoolLink<T> implements DataInterface<T> {
 			oos.writeInt(data.query.length());
 			oos.write(data.query.getBytes());
 		}else {
-			if(data.isSuccessful) {
-				oos.write(100);
+
+			oos.write(data.statusCode.getCode()+1);
+			if(data.statusCode==StatusCode.SECCESS) {
 				oos.writeInt(data.query.length());
 				oos.write(data.query.getBytes());
 				oos.writeObject(data.obj);
 			}else {
-				oos.write(200);
 				oos.writeInt(data.query.length());
 				oos.write(data.query.getBytes());
 			}
