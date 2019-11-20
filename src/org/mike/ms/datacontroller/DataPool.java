@@ -20,7 +20,7 @@ public class DataPool{
 	public DataPool() {
 	}
 	public <T> void addInterface(DataInterface<T> newInterface) {
-		if(newInterface==null)return;
+		if(newInterface==null||newInterface.getName().equals(""))return;
 		if(interfaces.containsKey(newInterface.getName()))
 			interfaces.get(newInterface.getName()).add(newInterface);
 		else {

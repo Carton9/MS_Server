@@ -14,17 +14,17 @@ import org.mike.ms.datacontroller.DataInterface;
  *
  */
 public abstract class HTTPAnalysister implements HTTPCoreDIPInterface, Runnable,Closeable{
-	DataInterface<String> backEndDataInterface;
-	DataInterface<HTTPCase> sendOutDataInterface;
+	DataInterface<String> backEndDataLink;
+	DataInterface<HTTPCase> dataLink;
 	ConcurrentLinkedQueue<HTTPCase> inQueue=new ConcurrentLinkedQueue<HTTPCase>();
 	boolean isClose=false;
 	String hostName;
 	@Override
 	public void run() {
 		while(!isClose) {
-			HTTPCase newCase=sendOutDataInterface.getData(this.getClass(), "*@CASE");
+			HTTPCase newCase=dataLink.getData(this.getClass(), "*@CASE");
 			processCase(newCase);
-			sendOutDataInterface.saveData(newCase.getCaseNumber().replace("CASE", "PASS"), newCase);
+			dataLink.saveData(newCase.getCaseNumber().replace("CASE", "PASS"), newCase);
 		}
 	}
 	@Override
@@ -44,4 +44,9 @@ public abstract class HTTPAnalysister implements HTTPCoreDIPInterface, Runnable,
 	}
 	public abstract void AnalysisterClose();
 	public abstract void processCase(HTTPCase newCase);
+	@Override
+	public void SetHTTPResourceCentor(HTTPResourceCentor rc) {
+		dataLink=rc.getAnalysisterDataInterface();
+		backEndDataLink=rc.getBackEndDataInterface();
+	}
 }

@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.mike.ms.datacontroller.DataInterface;
-import org.mike.ms.httpcore.HTTPResourceCentor.HTTPCode;
+import org.mike.ms.httpcore.HTTPCode;
 
 
 /**
@@ -82,6 +82,7 @@ public class HTTPParser implements HTTPCoreDIPInterface,Runnable,Closeable{
 	public void SetHTTPResourceCentor(HTTPResourceCentor rc) {
 		// TODO Auto-generated method stub
 		this.rc=rc;
+		dataLink=rc.getParserDataInterface();
 	}
 
 	@Override

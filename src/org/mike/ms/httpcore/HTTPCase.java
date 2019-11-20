@@ -5,7 +5,7 @@ package org.mike.ms.httpcore;
 
 import java.util.HashMap;
 
-import org.mike.ms.httpcore.HTTPResourceCentor.HTTPCode;
+import org.mike.ms.httpcore.HTTPCode;
 
 /**
  * @author c

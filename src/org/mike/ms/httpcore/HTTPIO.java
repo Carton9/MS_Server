@@ -16,20 +16,22 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.carton.common.secure.KeyUnit;
 import org.mike.ms.datacontroller.DataInterface;
+import org.mike.ms.datacontroller.Query;
 
 /**
  * @author c
  *
  */
-public class HTTPIO implements Runnable, Closeable{
+public class HTTPIO implements Runnable, Closeable,HTTPCoreDIPInterface{
 	ServerSocket ss=null;
 	Socket cs=null;
 	String socketKey="";
-	DataInterface<HTTPIO> clientCache;
+//	DataInterface<HTTPIO> clientCache;
 	DataInterface<HTTPCase> dataLink;
 	boolean run=true;
 	public HTTPIO(int port) throws IOException {
@@ -72,10 +74,18 @@ public class HTTPIO implements Runnable, Closeable{
 				}
 				String time=LocalDate.now().toString()+" "+LocalTime.now().toString();
 				HTTPCase newCase=new HTTPCase();
-				iDString=socketKey+"@RAW:"+"TIME$"+time+",ADDR$"+remoteAddr;
-				newCase.setCaseNumber(iDString);
+				HashMap<String, HashMap<String, String>> valueFile=new HashMap<String, HashMap<String,String>>();
+				HashMap<String, String> timeMap=new HashMap<String, String>();
+				timeMap.put("VALUE", time);
+				HashMap<String, String> remoteAddrMap=new HashMap<String, String>();
+				remoteAddrMap.put("VALUE", remoteAddr);
+				valueFile.put("TIME", timeMap);
+				valueFile.put("ADDR", remoteAddrMap);
+				Query q=Query.initAQuery(socketKey, "RAW", valueFile);
+				iDString=Query.formate(q);
+				newCase.setCaseNumber(Query.formate(q));
 				newCase.setRawDataReceive(finalData);
-				dataLink.saveData(iDString,newCase);
+				dataLink.saveData(Query.formate(q),newCase);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -84,6 +94,7 @@ public class HTTPIO implements Runnable, Closeable{
 			}
 			
 			try {
+				
 				HTTPCase replayCase=dataLink.getData(this.getClass(),iDString.replace("RAW", "PASS"));
 				BufferedOutputStream bos = new BufferedOutputStream(cs.getOutputStream());
 				if(replayCase!=null)
@@ -115,6 +126,11 @@ public class HTTPIO implements Runnable, Closeable{
 		// TODO Auto-generated method stub
 		run=false;
 		ss.close();
+	}
+	@Override
+	public void SetHTTPResourceCentor(HTTPResourceCentor rc) {
+		// TODO Auto-generated method stub
+		dataLink=rc.getIODataInterface();
 	}
 	
 }
