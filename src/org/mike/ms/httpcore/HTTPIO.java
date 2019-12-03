@@ -18,28 +18,34 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.logging.Logger;
 
 import org.carton.common.secure.KeyUnit;
 import org.mike.ms.datacontroller.DataInterface;
 import org.mike.ms.datacontroller.Query;
+import org.mike.ms.threadmanager.Service;
 
 /**
  * @author c
  *
  */
-public class HTTPIO implements Runnable, Closeable,HTTPCoreDIPInterface{
+public class HTTPIO implements Service,HTTPCoreDIPInterface{
 	ServerSocket ss=null;
 	Socket cs=null;
 	String socketKey="";
-//	DataInterface<HTTPIO> clientCache;
+	DataInterface<HTTPIO> clientCache;
 	DataInterface<HTTPCase> dataLink;
+	Logger log;
+	HTTPResourceCentor rc;
 	boolean run=true;
 	public HTTPIO(int port) throws IOException {
 		ss=new ServerSocket(port);
+		log=Logger.getGlobal();
 	}
 	HTTPIO(Socket cs,String key) throws IOException {
 		this.cs=cs;
 		socketKey=key;
+		log=Logger.getGlobal();
 	}
 	@Override
 	public void run() {
@@ -68,11 +74,16 @@ public class HTTPIO implements Runnable, Closeable,HTTPCoreDIPInterface{
 				}
 				byte[] finalData=new byte[size];
 				int pointer=0;
+				if(size<4) {
+					cs.close();
+					run=false;
+					return;
+				}
 				for(int i=0;i<data.size();i++) {
 					System.arraycopy(data.get(i), 0, finalData, pointer, data.get(i).length);
 					pointer+=data.get(i).length;
 				}
-				String time=LocalDate.now().toString()+" "+LocalTime.now().toString();
+				String time=LocalDate.now().toString()+"*"+LocalTime.now().toString();
 				HTTPCase newCase=new HTTPCase();
 				HashMap<String, HashMap<String, String>> valueFile=new HashMap<String, HashMap<String,String>>();
 				HashMap<String, String> timeMap=new HashMap<String, String>();
@@ -83,9 +94,11 @@ public class HTTPIO implements Runnable, Closeable,HTTPCoreDIPInterface{
 				valueFile.put("ADDR", remoteAddrMap);
 				Query q=Query.initAQuery(socketKey, "RAW", valueFile);
 				iDString=Query.formate(q);
-				newCase.setCaseNumber(Query.formate(q));
+				newCase.setCaseNumber(iDString);
 				newCase.setRawDataReceive(finalData);
-				dataLink.saveData(Query.formate(q),newCase);
+				dataLink.saveData
+				(iDString,
+						newCase);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -96,9 +109,30 @@ public class HTTPIO implements Runnable, Closeable,HTTPCoreDIPInterface{
 			try {
 				
 				HTTPCase replayCase=dataLink.getData(this.getClass(),iDString.replace("RAW", "PASS"));
+				while(replayCase==null) {
+					replayCase=dataLink.getData(this.getClass(),iDString.replace("RAW", "PASS"));
+				}
+				
 				BufferedOutputStream bos = new BufferedOutputStream(cs.getOutputStream());
-				if(replayCase!=null)
-					bos.write(replayCase.getRawDataSend());
+				if(replayCase!=null){
+					
+					if(replayCase.getRawDataSend()!=null&&replayCase.getRawDataSend().length>4){
+//						Logger.getGlobal().info(new String(replayCase.getRawDataSend())+"");
+						bos.write(replayCase.getRawDataSend());
+						bos.flush();
+					}
+					else if(replayCase.getCode()!=null){
+						String reply="HTTP/1.1 "+replayCase.getCode().getErrorCode()+" "+replayCase.getCode().getNote()+"\nContent-type: text/html\n\n";
+						bos.write(reply.getBytes());
+					}
+					else {
+						String reply="HTTP/1.1 "+HTTPCode.SERVICE_UNAVAILABLE.errorCode+" "+HTTPCode.SERVICE_UNAVAILABLE.getNote()+"\nContent-type: text/html\n\n";
+						bos.write(reply.getBytes());
+					}
+				}
+				bos.flush();
+				cs.close();
+				run=false;
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -112,8 +146,12 @@ public class HTTPIO implements Runnable, Closeable,HTTPCoreDIPInterface{
 			Socket client;
 			try {
 				client = ss.accept();
-				String key=KeyUnit.SHA512(System.currentTimeMillis()+" "+client.getRemoteSocketAddress().hashCode());
-				clientCache.saveData(key,new HTTPIO(client,key) );
+				log.info("Get A Client at "+client.getRemoteSocketAddress());
+				String key=KeyUnit.MD5(System.currentTimeMillis()+" "+client.getRemoteSocketAddress().hashCode());
+				client.setKeepAlive(true);
+				HTTPIO io=new HTTPIO(client,key);
+				io.SetHTTPResourceCentor(rc);
+				clientCache.saveData(key,io);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -131,6 +169,8 @@ public class HTTPIO implements Runnable, Closeable,HTTPCoreDIPInterface{
 	public void SetHTTPResourceCentor(HTTPResourceCentor rc) {
 		// TODO Auto-generated method stub
 		dataLink=rc.getIODataInterface();
+		clientCache=rc.getHTTPIOInterface();
+		this.rc=rc;
 	}
 	
 }

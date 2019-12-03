@@ -21,13 +21,14 @@ import org.carton.common.secure.KeyUnit;
 public class SQLInterface<T> implements DataInterface<T>,Closeable {
     private Connection conn = null ;
     DataInterface<T> upper;
-    private String url = "jdbc:mysql://localhost ";
-    private String user = "root ";
-    private String pwd = "0429 ";
+    private String url = "jdbc:mysql://localhost:3306";
+    private String user = "user";
+    private String pwd = "cjz461834";
     private static final String type="SQL";
     public SQLInterface(String user,String pwd) {
     	this.user=user;
     	this.pwd=pwd;
+    	init();
     }
 	@Override
 	public T getData(Class source,String key) {

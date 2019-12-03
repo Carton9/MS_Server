@@ -13,6 +13,7 @@ import org.mike.ms.datacontroller.GeneralCache;
  *
  */
 public interface HTTPResourceCentor {
+	public DataInterface<HTTPIO> getHTTPIOInterface();
 	public DataInterface<HTTPCase> getIODataInterface();
 	public DataInterface<HTTPCase> getParserDataInterface();
 	public DataInterface<HTTPCase> getAnalysisterDataInterface();

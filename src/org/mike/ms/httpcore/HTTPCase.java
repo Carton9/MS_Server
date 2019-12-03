@@ -3,9 +3,12 @@
  */
 package org.mike.ms.httpcore;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 
 import org.mike.ms.httpcore.HTTPCode;
+import org.mike.ms.udp.KeyValue;
 
 /**
  * @author c
@@ -21,13 +24,45 @@ public class HTTPCase {
 	private String method;
 	private String URL;
 	private String version;
+	private HashMap<String, String> cookieField=new HashMap<String, String>();
 	private HashMap<String, String> headers=new HashMap<String, String>();
 	private String Host;
 	private byte[] body;
 	/*********************///BY HTTPAnalysister
 	private HashMap<String, String> sessionDatas=new HashMap<String, String>();
+	private HashMap<String, String> responsesHeader=new HashMap<String, String>();
+	private byte[] responsesBody;
 	/*********************///BY HTTPIO send
 	private byte[] rawDataSend;
+	public String getResponsesHeader(String key) {
+		return responsesHeader.get(key);
+	}
+	public void addResponsesHeader(String key,String value) {
+		responsesHeader.put(key, value);
+	}
+	public ArrayList<KeyValue<String, String>> getCookieField(){
+		Iterator<String> it=cookieField.keySet().iterator();
+		ArrayList<KeyValue<String, String>> result=new ArrayList<KeyValue<String,String>>();
+		while(it.hasNext()) {
+			String key=it.next();
+			String value=cookieField.get(key);
+			result.add(new KeyValue<String, String>(key, value));
+		}
+		return result;
+	}
+	public ArrayList<KeyValue<String, String>> getResponsesHeader(){
+		Iterator<String> it=responsesHeader.keySet().iterator();
+		ArrayList<KeyValue<String, String>> result=new ArrayList<KeyValue<String,String>>();
+		while(it.hasNext()) {
+			String key=it.next();
+			String value=responsesHeader.get(key);
+			result.add(new KeyValue<String, String>(key, value));
+		}
+		return result;
+	}
+	public void addCookie(String key,String value) {
+		cookieField.put(key, value);
+	}
 	public void addHeader(String key,String value) {
 		headers.put(key, value);
 	}
@@ -36,6 +71,9 @@ public class HTTPCase {
 	}
 	public String getHeader(String key) {
 		return headers.get(key);
+	}
+	public String getCookie(String key) {
+		return cookieField.get(key);
 	}
 	public String getSessionDatas(String key) {
 		return sessionDatas.get(key);
@@ -153,5 +191,20 @@ public class HTTPCase {
 	 */
 	public void setHost(String host) {
 		Host = host;
+	}
+	public String toString() {
+		return new String(this.rawDataReceive)+"\n---"+headers.toString();
+	}
+	/**
+	 * @return the responsesBody
+	 */
+	public byte[] getResponsesBody() {
+		return responsesBody;
+	}
+	/**
+	 * @param responsesBody the responsesBody to set
+	 */
+	public void setResponsesBody(byte[] responsesBody) {
+		this.responsesBody = responsesBody;
 	}
 }

@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 import org.carton.common.secure.KeyUnit;
 import org.mike.ms.udp.GeneralUDPSocket;
@@ -26,10 +27,15 @@ import org.mike.ms.udp.ReceiveListener;
  * @author c
  *
  */
-public class PoolLink<T> implements DataInterface<T> {
+public class PoolLink implements DataInterface {
+	static final String target="255.255.255.255";
+//	static final String target="127.0.0.1";
 	ConcurrentHashMap<String,RemoteInfo> RemoteCase=new ConcurrentHashMap<String,RemoteInfo>();
 	GeneralUDPSocket generalUDPSocket;
-	DataInterface<T> upper;
+	DataInterface upper;
+	int targetport;
+	int port;
+	boolean isInited;
 	class RemoteInfo{
 		String query;
 		String type;
@@ -45,10 +51,19 @@ public class PoolLink<T> implements DataInterface<T> {
 			return this;
 		}
 	}
-	public PoolLink(){
-		while(true) {
+	public PoolLink(int port,int targetport){
+		this.port=port;
+		this.targetport=targetport;
+	}
+	public PoolLink(int port){
+		this.port=port;
+	}
+	public void configLink() {
+		
 			try {
-				generalUDPSocket=new GeneralUDPSocket(9090);
+				
+				generalUDPSocket=new GeneralUDPSocket(port);
+				
 				generalUDPSocket.addRecevieListener(new ReceiveListener() {
 					
 					@Override
@@ -91,7 +106,7 @@ public class PoolLink<T> implements DataInterface<T> {
 								rp.obj=obj;
 							}
 						}else if(rm.type.equals("WRITE")) {
-							upper.saveData(rm.query, (T) rm.obj);
+							upper.saveData(rm.query, rm.obj);
 							rp.statusCode=StatusCode.SECCESS;
 							
 						}
@@ -110,12 +125,16 @@ public class PoolLink<T> implements DataInterface<T> {
 						return false;
 					}
 				});
+				
+				if(generalUDPSocket!=null)upper.saveData("*@RUN", generalUDPSocket);
+				
 				return;
 			} catch (SocketException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
+				
 			}
-		}
+			
 	}
 	@Override
 	public String getName() {
@@ -124,10 +143,25 @@ public class PoolLink<T> implements DataInterface<T> {
 	}
 
 	@Override
-	public T getData(Class source, String key) {
+	public Object getData(Class source, String key) {
 		// TODO Auto-generated method stub
-		String secret=KeyUnit.SHA512(UUID.randomUUID().toString());
-		String query="REMOTE_R_"+secret+"@"+key;
+		
+		String query="REMOTE_R_"+"@"+key;
+		System.out.println(RemoteCase+"\n"+query+"\n"+RemoteCase.get(query));
+		if(RemoteCase.get(query)!=null&&RemoteCase.get(query).isReplay)return RemoteCase.remove(query).obj;
+		if (RemoteCase.get(query)!=null) {
+			synchronized (RemoteCase.get(query)) {
+				try {
+					RemoteCase.get(query).wait(100);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+					
+				}
+				
+				return RemoteCase.get(query).obj;
+			}
+		}
 		RemoteInfo remoteInfo=new RemoteInfo();
 		remoteInfo.query=query;
 		remoteInfo.type="READ";
@@ -156,12 +190,12 @@ public class PoolLink<T> implements DataInterface<T> {
 				RemoteInfo rm;
 				try {
 					rm = formateData(data);
+					RemoteCase.put(query, rm);
 				} catch (ClassNotFoundException | IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 					return;
 				}
-				RemoteCase.get(query).clone(rm).notifyAll();
 				finish=true;
 			}
 
@@ -173,34 +207,22 @@ public class PoolLink<T> implements DataInterface<T> {
 		});
 		
 		try {
-			generalUDPSocket.send(formateData(remoteInfo), 9090, InetAddress.getByName("255.255.255.255"));
+			generalUDPSocket.send(formateData(remoteInfo), targetport, InetAddress.getByName(target));
+			
 		} catch (IOException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 			return null;
 		}
-		for(int i=0;i<100;i++) {
-			try {
-				RemoteCase.get(query).wait(1000);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-				RemoteInfo rm=RemoteCase.get(query);
-				if(rm.statusCode==StatusCode.SECCESS&&rm.isReplay&&rm.obj!=null) {
-					return (T) rm.obj;
-				}
-			}
-			
-		}
 		return null;
 	}
 
 	@Override
-	public StatusCode saveData(String key, T obj) {
+	public StatusCode saveData(String key, Object obj) {
 		// TODO Auto-generated method stub
+		String query="REMOTE_W_"+"@"+key;
+		
 		boolean stop=false;
-		String secret=KeyUnit.SHA512(UUID.randomUUID().toString());
-		String query="REMOTE_W_"+secret+"@"+key;
 		RemoteInfo remoteInfo=new RemoteInfo();
 		remoteInfo.query=query;
 		remoteInfo.type="WRITE";
@@ -212,6 +234,7 @@ public class PoolLink<T> implements DataInterface<T> {
 			boolean finish=false;
 			@Override
 			public boolean verify(byte[] data, InetAddress ip, int port) {
+				if(data.length<5)return false;
 				RemoteInfo rm;
 				try {
 					rm = formateData(data);
@@ -249,35 +272,23 @@ public class PoolLink<T> implements DataInterface<T> {
 			}
 		});
 		try {
-			generalUDPSocket.send(formateData(remoteInfo), 9090, InetAddress.getByName("255.255.255.255"));
+			generalUDPSocket.send(formateData(remoteInfo), targetport, InetAddress.getByName(target));
 		} catch (IOException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 			return StatusCode.DATA_SAVE_FAILURE;
 		}
-		for(int i=0;i<100;i++) {
-			try {
-				RemoteCase.get(query).wait(1000);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-				RemoteInfo rm=RemoteCase.get(query);
-				if(rm.statusCode==StatusCode.SECCESS&&rm.isReplay) {
-					return rm.statusCode;
-				}
-			}
-			
-		}
-		RemoteCase.remove(query);
-		return StatusCode.ENTRY_NOT_FOUND;
+		
+		return StatusCode.SECCESS;
 	}
 
 	@Override
-	public void getUpperLevel(DataInterface<T> upper) {
+	public void getUpperLevel(DataInterface upper) {
 		// TODO Auto-generated method stub;
 		this.upper=upper;
 	}
 	private RemoteInfo formateData(byte[] data) throws ClassNotFoundException, IOException {
+		
 		ByteArrayInputStream bais=new ByteArrayInputStream(data);
 		DataInputStream dis=new DataInputStream(bais);
 		ObjectInputStream ois=new ObjectInputStream(dis);
@@ -303,12 +314,15 @@ public class PoolLink<T> implements DataInterface<T> {
 		return remoteInfo;
 	}
 	private byte[] formateData(RemoteInfo data) throws IOException {
+
 		ByteArrayOutputStream bos=new ByteArrayOutputStream();
 		ObjectOutputStream oos=new ObjectOutputStream(bos);
 		if(!data.isReplay) {
 			oos.write(000);
 			oos.writeInt(data.query.length());
 			oos.write(data.query.getBytes());
+			
+			Logger.getGlobal().info(bos.toByteArray().length+" ");
 		}else {
 
 			oos.write(data.statusCode.getCode()+1);
@@ -321,6 +335,7 @@ public class PoolLink<T> implements DataInterface<T> {
 				oos.write(data.query.getBytes());
 			}
 		}
+		oos.flush();
 		return bos.toByteArray();
 	}
 

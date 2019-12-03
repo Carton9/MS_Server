@@ -8,6 +8,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Logger;
+
+import org.mike.ms.threadmanager.Service;
 
 /**
  * @author c
@@ -28,6 +31,7 @@ public class DataPool{
 			newList.add(newInterface);
 			interfaces.put(newInterface.getName(), newList);
 		}
+		newInterface.getUpperLevel(getInterface());
 	}
 	public <T> DataInterface<T> getInterface(){
 		return new DataInterface<T>() {
@@ -41,6 +45,7 @@ public class DataPool{
 			@Override
 			public T getData(Class source, String key) {
 				// TODO Auto-generated method stub
+				
 				try {
 					return getDataFromPool(source, key);
 				} catch (InterruptedException e) {
@@ -80,14 +85,18 @@ public class DataPool{
 		}
 		String type=q.path.get(q.path.size()-1);
 		T obj=null;
+		if(key.contains("PASS")||key.contains("CASE")||key.contains("RAW"))isRemote=true;
 		if(!interfaces.containsKey(type)) {
-			if(!isRemote)
-				obj=getDataFromOtherInterface(key,interfaces.get("PoolLink"));
+			if(!isRemote){
+				obj=getDataFromOtherInterface(key, source,interfaces.get("PoolLink"));
+			}
 			return obj;
 		}else {
-			obj=getDataFromOtherInterface(key,interfaces.get(type));
-			if(obj==null&&!isRemote)
-				obj=getDataFromOtherInterface(key,interfaces.get("PoolLink"));
+			obj=getDataFromOtherInterface(key,source,interfaces.get(type));
+			if(obj==null&&!isRemote){
+				Logger.getGlobal().info(key);
+				obj=getDataFromOtherInterface(key,source,interfaces.get("PoolLink"));
+			}
 			return obj;
 		}
 		
@@ -99,18 +108,41 @@ public class DataPool{
 			isRemote|=p.contains("REMOTE");
 		}
 		String type=q.path.get(q.path.size()-1);
+		if(key.contains("PASS")||key.contains("CASE")||key.contains("RAW")||key.contains("RUN"))isRemote=true;
 		if(!interfaces.containsKey(type)) {
-			if(!isRemote)
+			
+			if(!isRemote) {
 				return saveDataToInterface(key,obj,interfaces.get("PoolLink"));
+			}
 			return StatusCode.INTERFACE_NOT_FOUND;
 		}else {
 			StatusCode saved=saveDataToInterface(key,obj,interfaces.get(type));
+			System.out.println("TP2 "+key+" "+interfaces.containsKey(type)+" "+saved);
 			StatusCode savedRemote=null;
-			if(!isRemote)
-				savedRemote=saveDataToInterface(key,obj,interfaces.get("PoolLink"));
-			if(savedRemote==StatusCode.DATA_SAVE_FAILURE)
-				return StatusCode.DATA_NO_SYNC;
-			return saved.addCode(savedRemote);
+			if(!isRemote){
+				getInterface().saveData("*@RUN", new Service() {
+					
+					@Override
+					public void close() throws Exception {
+						// TODO Auto-generated method stub
+						
+					}
+					
+					@Override
+					public void run() {
+						// TODO Auto-generated method stub
+						try {
+							saveDataToInterface(key,obj,interfaces.get("PoolLink"));
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+							return;
+						}
+					}
+				});
+				
+			}
+			return saved;
 		}
 	}
 //	@Override
@@ -143,6 +175,7 @@ public class DataPool{
 //		return "DATAPOOL-"+id;
 //	}
 	private<T> StatusCode saveDataToInterface(String key, T obj,ArrayList<DataInterface> ifList) throws InterruptedException{
+		if(ifList==null)return StatusCode.DATA_SAVE_FAILURE;
 		Thread threadList[]=new Thread[ifList.size()];
 		StatusCode result[]=new StatusCode[ifList.size()];
 		for(int i=0;i<ifList.size();i++) {
@@ -177,7 +210,8 @@ public class DataPool{
 			if(finish==ifList.size())return StatusCode.formateCode(minCode);
 		}
 	}
-	private<T> T getDataFromOtherInterface(String key,ArrayList<DataInterface> ifList) throws InterruptedException {
+	private<T> T getDataFromOtherInterface(String key,Class source,ArrayList<DataInterface> ifList) throws InterruptedException {
+		if(ifList==null)return null;
 		Object result[]=new Object[ifList.size()];
 		Thread threadList[]=new Thread[ifList.size()];
 		for(int i=0;i<ifList.size();i++) {
@@ -187,7 +221,7 @@ public class DataPool{
 				@Override
 				public void run() {
 					// TODO Auto-generated method stub
-					result[pointer]=ifList.get(pointer).getData(DataPool.class,key);
+					result[pointer]=ifList.get(pointer).getData(source,key);
 				}
 				
 			};

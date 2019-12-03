@@ -1,12 +1,14 @@
 package org.mike.ms.udp;
 
 import java.util.HashMap;
+
+import org.mike.ms.threadmanager.Service;
 /**
  * 
  * @author mike
  *
  */
-public abstract class GeneralService {
+public abstract class GeneralService implements Service {
 	/**
 	 * The method will return a unique name as the key in save the {@code GeneralServiceExecutePool} 
 	 * @return
@@ -53,4 +55,14 @@ public abstract class GeneralService {
 	 * @param map
 	 */
 	protected abstract void callListener(HashMap<String,Object> map);
+	@Override
+	public void run() {
+		initialize();
+		if(!isInitialized())return;
+		while(!isFinish())execute();
+	}
+	@Override
+	public void close() {
+		finish();
+	}
 }

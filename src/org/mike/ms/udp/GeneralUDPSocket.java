@@ -16,6 +16,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Logger;
 /**
  * 
  * @author mike
@@ -68,7 +70,10 @@ public class GeneralUDPSocket extends GeneralService{
 
 	public void initialize() {
 		// TODO Auto-generated method stub
-		listenerList=new ArrayList<ServiceListener>();
+		if(isInitialized())return;
+		listenerList=new CopyOnWriteArrayList<ServiceListener>();
+//				new ConcurrentLinkedQueue<ServiceListener>()
+//				new ArrayList();
 		status[0]=ds.isBound();
 		resendQueue=new ConcurrentLinkedQueue<Integer>();
 		recevieQueue=new ConcurrentLinkedQueue<byte[]>();
@@ -192,9 +197,13 @@ public class GeneralUDPSocket extends GeneralService{
 	}
 
 	public void addListener(ServiceListener l) {
+		if(listenerList==null)
+			this.initialize();
 		listenerList.add(l);
 	}
 	public void addRecevieListener(ReceiveListener l) {
+		if(listenerList==null)
+			this.initialize();
 		listenerList.add(l);
 	}
 	protected void updateListener(InetAddress address,int port) {
@@ -202,9 +211,11 @@ public class GeneralUDPSocket extends GeneralService{
 		map.put("data", this.recevieQueue.poll());
 		map.put("address", address);
 		map.put("port", port);
-		for(ServiceListener i:listenerList) {
-			i.action(map);
-			if(i.isFinish())listenerList.remove(i);
+		synchronized (listenerList) {
+			for(ServiceListener i:listenerList) {
+				i.action(map);
+				if(i.isFinish())listenerList.remove(i);
+			}
 		}
 	}
 
@@ -215,6 +226,7 @@ public class GeneralUDPSocket extends GeneralService{
 		if(data.length<1)
 			return;
 		try {
+			
 			ByteArrayInputStream bis=new ByteArrayInputStream(data);
 			ArrayList<DatagramPacket> dataGroup=new ArrayList<DatagramPacket>();
 			byte[] buffer=new byte[this.dataLength];
@@ -233,6 +245,7 @@ public class GeneralUDPSocket extends GeneralService{
 				count++;
 				buffer=new byte[this.dataLength];
 			}
+			
 			ByteArrayOutputStream bos=new ByteArrayOutputStream();
 			DataOutputStream dos=new DataOutputStream(bos);
 			dos.writeChar(this.LengthSign);
@@ -250,7 +263,6 @@ public class GeneralUDPSocket extends GeneralService{
 	}
 	private void send() throws IOException, InterruptedException {
 		if(!sendingQueue.isEmpty()) {
-			
 			DatagramPacket[] datas=sendingQueue.poll();
 			for(DatagramPacket i:datas) {
 				ds.send(i);
