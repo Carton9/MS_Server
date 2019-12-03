@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 
 import org.mike.ms.datacontroller.DataInterface;
 import org.mike.ms.datacontroller.StatusCode;
+import org.mike.ms.manager.ServerProbe;
 
 /**
  * @author c
@@ -25,7 +26,7 @@ public class ThreadPoolManager {
 		return threadManager;
 	}
 	private ThreadPoolManager(){
-		
+		this.getThreadInterface().saveData("PROBE", ServerProbe.getDefaultProbe());
 	}
 	public<T extends Service> ThreadInterface<T> getThreadInterface() {
 		return new ThreadInterface<T>();
